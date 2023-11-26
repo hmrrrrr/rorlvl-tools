@@ -1,0 +1,19 @@
+{
+    "exclude": [
+      "node_modules",
+      "./node_modules",
+      "./node_modules/*",
+      "./node_modules/@types/node/index.d.ts",
+    ],
+    "compilerOptions": {
+        "outFile": "rorlvl.mjs",
+        "types":["node"],
+        "typeRoots": ["node_modules/@types"],
+        "module": "AMD",
+        "target":"es2016",
+        "sourceMap": false,
+        "moduleResolution": "node",
+        "skipLibCheck": true,
+        "lib": ["es2016"],
+    },
+}

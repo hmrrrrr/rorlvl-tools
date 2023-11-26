@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "@mapeditor/tiled-api": "^1.10.1"
+  },
+  "dependencies": {
+    "@types/node": "^20.9.5",
+    "node": "^21.2.0"
+  }
+}
