@@ -54,7 +54,7 @@ class RORLayer {
         this.tilemap = tileMapName;
 
         let metaStart = tileMapNameTerminatorIndex + 1;
-        this.tileCount = data.getInt16(metaStart+2, true);
+        this.tileCount = data.getUint16(metaStart+2, true);
         let metaEnd = metaStart + 6;
 
         this.meta = bData.slice(metaStart, metaEnd);
