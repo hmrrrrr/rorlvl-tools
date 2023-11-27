@@ -6,13 +6,13 @@ class RORTile {
     atlasY: number;
     x: number;
     y: number;
+    collision: boolean;
 
     constructor(bData: ArrayBuffer) {
         let data = new DataView(bData);
         if(bData.byteLength !== 6){
             tiled.log("Tile Data: " + bData.byteLength);
         }
-
         this.atlasX = data.getUint8(0);
         this.atlasY = data.getUint8(1);
         this.x = data.getInt16(2, true);
@@ -79,6 +79,8 @@ class RORLayer {
 
 
 const META_LAYER_COUNT = 0x1A;
+const META_COLLISION_COUNT = 0x1C;
+const META_OBJECT_COUNT = 0x1D;
 const LAYERS_START = 0x25;
 const COLOR_START = 0x21
 
@@ -104,7 +106,10 @@ const format = tiled.registerMapFormat("rorlvl", {
         let colorHexString = "#"+colorBytes.reduce((str, byte) => str + byte.toString(16).padStart(2, "0"), "");
         map.backgroundColor = colorHexString;
         let data = new DataView(bData);
-        let layerCount = data.getInt8(META_LAYER_COUNT);
+        
+        let layerCount = data.getUint16(META_LAYER_COUNT,true);
+        let collisionTypeCount = data.getUint8(META_COLLISION_COUNT);
+        let objectCount = data.getUint16(META_OBJECT_COUNT,true);
 
 
         let mapX = data.getInt16(0x12, true);
@@ -120,11 +125,17 @@ const format = tiled.registerMapFormat("rorlvl", {
         let index = LAYERS_START;
         let currentLayer: RORLayer;
 
+        let collisionTileset = new Tileset("Collision");
+        collisionTileset.tileWidth = 32;
+        collisionTileset.tileHeight = 32;
+        collisionTileset.image = tiled.extensionsPath + "/collision_tile.png";
+        map.addTileset(collisionTileset);
+
         let tilesets = new Array<Tileset>();
 
         let processedTilesets = {};
-        
-        for(let i = 0; i < layerCount; index+=currentLayer.dataEnd, i++){
+        let i: number;
+        for(i=0; i < layerCount; index+=currentLayer.dataEnd, i++){
             currentLayer = new RORLayer(bData.slice(index))
             
 
@@ -138,7 +149,7 @@ const format = tiled.registerMapFormat("rorlvl", {
             let newTileset: Tileset;
             
             if(processedTilesets[tmName] === undefined){
-                newTileset = new Tileset(tmName+"_0");
+                newTileset = new Tileset(tmName);
                 newTileset.tileWidth = 32;
                 newTileset.tileHeight = 32;
                 newTileset.image = imgpath;
@@ -166,11 +177,11 @@ const format = tiled.registerMapFormat("rorlvl", {
                 }
                 else{
                     let t: Tile = newTileset.tile(id);
+                    
                     if(element.x - mapX < mapWidth && element.y - mapY < mapHeight){
                     edit.setTile(element.x - mapX, element.y - mapY, t)
                     }
                 }
-
             });
             
             edit.apply();
@@ -188,6 +199,35 @@ const format = tiled.registerMapFormat("rorlvl", {
         });
 
         tiled.log(layers.length + " Layers");
+
+        let collisionLayer = new TileLayer("Collision");
+        let collisionEdit = collisionLayer.edit();
+        
+        for(i = 0; i < collisionTypeCount; i++){
+            let type = data.getUint8(index);
+            tiled.log("Collision Type: " + type)
+            let count = data.getUint32(index+1, true);
+            index += 5;
+            tiled.log("Collision Count: " + count)
+
+
+
+            let collisionTile = collisionTileset.tile(type);
+
+            for(let j = 0; j < count; j++){
+                let x = data.getInt16(index+4*j, true)/2
+                let y = data.getInt16(index+4*j+2, true)/2
+                
+                tiled.log("Collision Tile: " + x + ", " + y);
+                collisionEdit.setTile(x-mapX, y-mapY, collisionTile);
+            }
+            index += count*4;
+        }
+        collisionEdit.apply();
+        map.addLayer(collisionLayer);
+
+
+
         return map;
     }
 });

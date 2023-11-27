@@ -50,6 +50,8 @@ class RORLayer {
     }
 }
 const META_LAYER_COUNT = 0x1A;
+const META_COLLISION_COUNT = 0x1C;
+const META_OBJECT_COUNT = 0x1D;
 const LAYERS_START = 0x25;
 const COLOR_START = 0x21;
 const format = tiled.registerMapFormat("rorlvl", {
@@ -70,7 +72,9 @@ const format = tiled.registerMapFormat("rorlvl", {
         let colorHexString = "#" + colorBytes.reduce((str, byte) => str + byte.toString(16).padStart(2, "0"), "");
         map.backgroundColor = colorHexString;
         let data = new DataView(bData);
-        let layerCount = data.getInt8(META_LAYER_COUNT);
+        let layerCount = data.getUint16(META_LAYER_COUNT, true);
+        let collisionTypeCount = data.getUint8(META_COLLISION_COUNT);
+        let objectCount = data.getUint16(META_OBJECT_COUNT, true);
         let mapX = data.getInt16(0x12, true);
         let mapY = data.getInt16(0x14, true);
         let mapWidth = data.getUint16(0x16, true) - mapX;
@@ -81,16 +85,22 @@ const format = tiled.registerMapFormat("rorlvl", {
         let mapLayers = new Array();
         let index = LAYERS_START;
         let currentLayer;
+        let collisionTileset = new Tileset("Collision");
+        collisionTileset.tileWidth = 32;
+        collisionTileset.tileHeight = 32;
+        collisionTileset.image = tiled.extensionsPath + "/collision_tile.png";
+        map.addTileset(collisionTileset);
         let tilesets = new Array();
         let processedTilesets = {};
-        for (let i = 0; i < layerCount; index += currentLayer.dataEnd, i++) {
+        let i;
+        for (i = 0; i < layerCount; index += currentLayer.dataEnd, i++) {
             currentLayer = new RORLayer(bData.slice(index));
             let layer = new TileLayer(currentLayer.name);
             let tmName = currentLayer.tilemap.slice(4, -1);
             let imgpath = tiled.extensionsPath + "/Export_Sprites/b" + tmName + "_0.png";
             let newTileset;
             if (processedTilesets[tmName] === undefined) {
-                newTileset = new Tileset(tmName + "_0");
+                newTileset = new Tileset(tmName);
                 newTileset.tileWidth = 32;
                 newTileset.tileHeight = 32;
                 newTileset.image = imgpath;
@@ -124,6 +134,25 @@ const format = tiled.registerMapFormat("rorlvl", {
             map.addLayer(element);
         });
         tiled.log(layers.length + " Layers");
+        let collisionLayer = new TileLayer("Collision");
+        let collisionEdit = collisionLayer.edit();
+        for (i = 0; i < collisionTypeCount; i++) {
+            let type = data.getUint8(index);
+            tiled.log("Collision Type: " + type);
+            let count = data.getUint32(index + 1, true);
+            index += 5;
+            tiled.log("Collision Count: " + count);
+            let collisionTile = collisionTileset.tile(type);
+            for (let j = 0; j < count; j++) {
+                let x = data.getInt16(index + 4 * j, true) / 2;
+                let y = data.getInt16(index + 4 * j + 2, true) / 2;
+                tiled.log("Collision Tile: " + x + ", " + y);
+                collisionEdit.setTile(x - mapX, y - mapY, collisionTile);
+            }
+            index += count * 4;
+        }
+        collisionEdit.apply();
+        map.addLayer(collisionLayer);
         return map;
     }
 });
